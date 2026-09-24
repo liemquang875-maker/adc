@@ -1,66 +1,232 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP8266 Water Tank Monitor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 320px;
+        }
+        .tank-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #00e676;
+            margin-bottom: 15px;
+        }
+        .ip-box {
+            margin-bottom: 20px;
+        }
+        .ip-box label {
+            display: block;
+            font-size: 13px;
+            color: #aaa;
+            margin-bottom: 5px;
+        }
+        .ip-box input {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #2a2a2a;
+            color: #fff;
+            width: 80%;
+            text-align: center;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        /* Khung bình chứa dạng 3D */
+        .tank-wrapper {
+            position: relative;
+            width: 160px;
+            height: 240px;
+            margin: 0 auto;
+        }
+        .tank {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 3px solid #7f8c8d;
+            border-radius: 80px / 20px;
+            background: rgba(255, 255, 255, 0.05);
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        
+        /* Vạch chia độ */
+        .ruler {
+            position: absolute;
+            right: -15px;
+            top: 15px;
+            bottom: 15px;
+            width: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .ruler-line {
+            width: 100%;
+            height: 2px;
+            background-color: #555;
+        }
 
-// --- THÔNG TIN WIFI ---
-const char* ssid     = "Liem";          // Tên WiFi của bạn
-const char* password = "matkhautu1den8"; // Mật khẩu WiFi
+        /* Mực nước */
+        .water {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(180deg, #3498db, #2980b9);
+            transition: height 0.6s ease-in-out, background 0.4s ease;
+        }
+        .water-surface {
+            position: absolute;
+            top: -12px;
+            left: 0;
+            width: 100%;
+            height: 24px;
+            background: #5dede7;
+            border-radius: 50%;
+            opacity: 0.8;
+        }
 
-ESP8266WebServer server(80);
+        /* Cảnh báo mực nước thấp (< 20%) */
+        .water.low {
+            background: linear-gradient(180deg, #e74c3c, #c0392b);
+        }
+        .water.low .water-surface {
+            background: #ff7675;
+        }
 
-#define ANALOG_PIN A0
+        /* Nhãn phần trăm */
+        .percent-label {
+            position: absolute;
+            right: -60px;
+            font-weight: bold;
+            font-size: 16px;
+            color: #3498db;
+            transition: bottom 0.6s ease-in-out;
+        }
+        .percent-label.low {
+            color: #e74c3c;
+        }
 
-// Cấu hình các Header CORS cho phép GitHub Pages kết nối
-void setCORSHeaders() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
-}
+        .info-panel {
+            margin-top: 30px;
+            background: #2a2a2a;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #ccc;
+        }
+        .info-value {
+            font-weight: bold;
+            color: #00e676;
+        }
+        .status-text {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #ffab00;
+        }
+    </style>
+</head>
+<body>
 
-// Trả về dữ liệu dạng JSON cho GitHub Pages
-void handleData() {
-  setCORSHeaders();
+<div class="container">
+    <div class="tank-title">ESP8266 Water Tank</div>
 
-  int analogValue = analogRead(ANALOG_PIN);
-  int percent = map(analogValue, 0, 1023, 0, 100);
-  float voltage = (analogValue / 1023.0) * 3.3;
+    <div class="ip-box">
+        <label for="ipInput">Địa chỉ IP ESP8266:</label>
+        <input type="text" id="ipInput" value="10.49.100.34" placeholder="Nhập IP ESP8266">
+    </div>
 
-  String json = "{";
-  json += "\"raw\":" + String(analogValue) + ",";
-  json += "\"percent\":" + String(percent) + ",";
-  json += "\"voltage\":" + String(voltage, 2);
-  json += "}";
+    <div class="tank-wrapper">
+        <div class="tank">
+            <div class="water" id="waterLevel">
+                <div class="water-surface"></div>
+            </div>
+        </div>
+        
+        <div class="ruler">
+            <div class="ruler-line"></div>
+            <div class="ruler-line"></div>
+            <div class="ruler-line"></div>
+            <div class="ruler-line"></div>
+            <div class="ruler-line"></div>
+            <div class="ruler-line"></div>
+            <div class="ruler-line"></div>
+            <div class="ruler-line"></div>
+            <div class="ruler-line"></div>
+        </div>
 
-  server.send(200, "application/json", json);
-}
+        <div class="percent-label" id="percentText" style="bottom: 0%;">0%</div>
+    </div>
 
-// Phản hồi truy vấn Preflight OPTIONS từ trình duyệt
-void handleCORS() {
-  setCORSHeaders();
-  server.send(204);
-}
+    <div class="info-panel">
+        <div>Điện áp A0: <span class="info-value" id="voltageVal">0.00 V</span></div>
+        <div>Tín hiệu ADC: <span class="info-value" id="rawVal">0 / 1023</span></div>
+    </div>
 
-void setup() {
-  Serial.begin(115200);
+    <div class="status-text" id="statusText">Đang chờ kết nối...</div>
+</div>
 
-  WiFi.begin(ssid, password);
-  Serial.print("Đang kết nối WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
+<script>
+    function updateTankData() {
+        const ip = document.getElementById("ipInput").value.trim();
+        if (!ip) return;
 
-  Serial.println("\nKết nối WiFi thành công!");
-  Serial.print("Địa chỉ IP ESP8266: ");
-  Serial.println(WiFi.localIP());
+        fetch(`http://${ip}/data`, { mode: 'cors' })
+            .then(response => {
+                if (!response.ok) throw new Error("Lỗi kết nối");
+                return response.json();
+            })
+            .then(data => {
+                let percent = data.percent;
+                let water = document.getElementById('waterLevel');
+                let percentText = document.getElementById('percentText');
 
-  // Định nghĩa API
-  server.on("/data", HTTP_GET, handleData);
-  server.on("/data", HTTP_OPTIONS, handleCORS);
+                water.style.height = percent + '%';
+                percentText.style.bottom = Math.max(percent - 5, 0) + '%';
+                percentText.innerText = percent + '%';
 
-  server.begin();
-  Serial.println("HTTP Server đã sẵn sàng!");
-}
+                if (percent < 20) {
+                    water.classList.add('low');
+                    percentText.classList.add('low');
+                } else {
+                    water.classList.remove('low');
+                    percentText.classList.remove('low');
+                }
 
-void loop() {
-  server.handleClient();
-}
+                document.getElementById('voltageVal').innerText = data.voltage + ' V';
+                document.getElementById('rawVal').innerText = data.raw + ' / 1023';
+
+                document.getElementById('statusText').innerText = "Đã kết nối thành công!";
+                document.getElementById('statusText').style.color = "#00e676";
+            })
+            .catch(error => {
+                document.getElementById('statusText').innerText = "Không kết nối được tới ESP8266!";
+                document.getElementById('statusText').style.color = "#ff5252";
+            });
+    }
+
+    setInterval(updateTankData, 1000);
+    updateTankData();
+</script>
+
+</body>
+</html>
