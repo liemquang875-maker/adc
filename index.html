@@ -8,29 +8,42 @@
         body { font-family: Arial, sans-serif; text-align: center; background: #121212; color: #fff; padding-top: 50px; }
         .card { background: #1e1e1e; display: inline-block; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         .value { font-size: 48px; color: #00e676; font-weight: bold; margin: 20px 0; }
+        .status { font-size: 14px; color: #ffab00; }
+        input { padding: 8px; border-radius: 4px; border: none; margin-bottom: 15px; width: 200px; text-align: center; }
     </style>
 </head>
 <body>
     <div class="card">
         <h2>Giá Trị ADC (ESP8266)</h2>
+        <div>
+            <label>IP ESP8266: </label>
+            <input type="text" id="ipInput" value="192.168.1.50" placeholder="Nhập IP ESP8266">
+        </div>
         <div class="value" id="adcValue">0</div>
-        <p>Đang tự động cập nhật...</p>
+        <div class="status" id="statusText">Đang kết nối...</div>
     </div>
 
     <script>
-        // Thay địa chỉ IP bên dưới bằng IP của ESP8266 hiển thị trên Serial Monitor
-        const espIP = "http://192.168.1.50"; 
-
         function fetchADC() {
-            fetch(`${espIP}/data`)
-                .then(response => response.text())
+            const ip = document.getElementById("ipInput").value.trim();
+            if (!ip) return;
+
+            fetch(`http://${ip}/data`, { mode: 'cors' })
+                .then(response => {
+                    if (!response.ok) throw new Error("Lỗi phản hồi từ server");
+                    return response.text();
+                })
                 .then(data => {
                     document.getElementById("adcValue").innerText = data;
+                    document.getElementById("statusText").innerText = "Kết nối thành công!";
+                    document.getElementById("statusText").style.color = "#00e676";
                 })
-                .catch(err => console.log("Chưa kết nối được ESP8266:", err));
+                .catch(err => {
+                    document.getElementById("statusText").innerText = "Không thể kết nối tới ESP8266! Lỗi: " + err.message;
+                    document.getElementById("statusText").style.color = "#ff5252";
+                });
         }
 
-        // Cập nhật dữ liệu mỗi 1 giây
         setInterval(fetchADC, 1000);
     </script>
 </body>
