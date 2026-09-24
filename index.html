@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP8266 ADC Monitor</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #121212; color: #fff; padding-top: 50px; }
+        .card { background: #1e1e1e; display: inline-block; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .value { font-size: 48px; color: #00e676; font-weight: bold; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Giá Trị ADC (ESP8266)</h2>
+        <div class="value" id="adcValue">0</div>
+        <p>Đang tự động cập nhật...</p>
+    </div>
+
+    <script>
+        // Thay địa chỉ IP bên dưới bằng IP của ESP8266 hiển thị trên Serial Monitor
+        const espIP = "http://192.168.1.50"; 
+
+        function fetchADC() {
+            fetch(`${espIP}/data`)
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById("adcValue").innerText = data;
+                })
+                .catch(err => console.log("Chưa kết nối được ESP8266:", err));
+        }
+
+        // Cập nhật dữ liệu mỗi 1 giây
+        setInterval(fetchADC, 1000);
+    </script>
+</body>
+</html>
