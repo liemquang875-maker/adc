@@ -1,50 +1,66 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP8266 ADC Monitor</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #121212; color: #fff; padding-top: 50px; }
-        .card { background: #1e1e1e; display: inline-block; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .value { font-size: 48px; color: #00e676; font-weight: bold; margin: 20px 0; }
-        .status { font-size: 14px; color: #ffab00; }
-        input { padding: 8px; border-radius: 4px; border: none; margin-bottom: 15px; width: 200px; text-align: center; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h2>Giá Trị ADC (ESP8266)</h2>
-        <div>
-            <label>IP ESP8266: </label>
-            <input type="text" id="ipInput" value="192.168.1.50" placeholder="Nhập IP ESP8266">
-        </div>
-        <div class="value" id="adcValue">0</div>
-        <div class="status" id="statusText">Đang kết nối...</div>
-    </div>
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
 
-    <script>
-        function fetchADC() {
-            const ip = document.getElementById("ipInput").value.trim();
-            if (!ip) return;
+// --- THÔNG TIN WIFI ---
+const char* ssid     = "Liem";          // Tên WiFi của bạn
+const char* password = "matkhautu1den8"; // Mật khẩu WiFi
 
-            fetch(`http://${ip}/data`, { mode: 'cors' })
-                .then(response => {
-                    if (!response.ok) throw new Error("Lỗi phản hồi từ server");
-                    return response.text();
-                })
-                .then(data => {
-                    document.getElementById("adcValue").innerText = data;
-                    document.getElementById("statusText").innerText = "Kết nối thành công!";
-                    document.getElementById("statusText").style.color = "#00e676";
-                })
-                .catch(err => {
-                    document.getElementById("statusText").innerText = "Không thể kết nối tới ESP8266! Lỗi: " + err.message;
-                    document.getElementById("statusText").style.color = "#ff5252";
-                });
-        }
+ESP8266WebServer server(80);
 
-        setInterval(fetchADC, 1000);
-    </script>
-</body>
-</html>
+#define ANALOG_PIN A0
+
+// Cấu hình các Header CORS cho phép GitHub Pages kết nối
+void setCORSHeaders() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+// Trả về dữ liệu dạng JSON cho GitHub Pages
+void handleData() {
+  setCORSHeaders();
+
+  int analogValue = analogRead(ANALOG_PIN);
+  int percent = map(analogValue, 0, 1023, 0, 100);
+  float voltage = (analogValue / 1023.0) * 3.3;
+
+  String json = "{";
+  json += "\"raw\":" + String(analogValue) + ",";
+  json += "\"percent\":" + String(percent) + ",";
+  json += "\"voltage\":" + String(voltage, 2);
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
+// Phản hồi truy vấn Preflight OPTIONS từ trình duyệt
+void handleCORS() {
+  setCORSHeaders();
+  server.send(204);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  WiFi.begin(ssid, password);
+  Serial.print("Đang kết nối WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nKết nối WiFi thành công!");
+  Serial.print("Địa chỉ IP ESP8266: ");
+  Serial.println(WiFi.localIP());
+
+  // Định nghĩa API
+  server.on("/data", HTTP_GET, handleData);
+  server.on("/data", HTTP_OPTIONS, handleCORS);
+
+  server.begin();
+  Serial.println("HTTP Server đã sẵn sàng!");
+}
+
+void loop() {
+  server.handleClient();
+}
