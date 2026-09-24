@@ -27,30 +27,8 @@
             font-size: 22px;
             font-weight: bold;
             color: #00e676;
-            margin-bottom: 15px;
-        }
-        .ip-box {
             margin-bottom: 20px;
         }
-        .ip-box label {
-            display: block;
-            font-size: 13px;
-            color: #aaa;
-            margin-bottom: 5px;
-        }
-        .ip-box input {
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid #333;
-            background: #2a2a2a;
-            color: #fff;
-            width: 80%;
-            text-align: center;
-            font-size: 14px;
-            outline: none;
-        }
-        
-        /* Khung bình chứa dạng 3D */
         .tank-wrapper {
             position: relative;
             width: 160px;
@@ -67,25 +45,6 @@
             overflow: hidden;
             box-sizing: border-box;
         }
-        
-        /* Vạch chia độ */
-        .ruler {
-            position: absolute;
-            right: -15px;
-            top: 15px;
-            bottom: 15px;
-            width: 8px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        .ruler-line {
-            width: 100%;
-            height: 2px;
-            background-color: #555;
-        }
-
-        /* Mực nước */
         .water {
             position: absolute;
             bottom: 0;
@@ -104,16 +63,12 @@
             border-radius: 50%;
             opacity: 0.8;
         }
-
-        /* Cảnh báo mực nước thấp (< 20%) */
         .water.low {
             background: linear-gradient(180deg, #e74c3c, #c0392b);
         }
         .water.low .water-surface {
             background: #ff7675;
         }
-
-        /* Nhãn phần trăm */
         .percent-label {
             position: absolute;
             right: -60px;
@@ -125,7 +80,6 @@
         .percent-label.low {
             color: #e74c3c;
         }
-
         .info-panel {
             margin-top: 30px;
             background: #2a2a2a;
@@ -150,30 +104,12 @@
 <div class="container">
     <div class="tank-title">ESP8266 Water Tank</div>
 
-    <div class="ip-box">
-        <label for="ipInput">Địa chỉ IP ESP8266:</label>
-        <input type="text" id="ipInput" value="10.49.100.34" placeholder="Nhập IP ESP8266">
-    </div>
-
     <div class="tank-wrapper">
         <div class="tank">
             <div class="water" id="waterLevel">
                 <div class="water-surface"></div>
             </div>
         </div>
-        
-        <div class="ruler">
-            <div class="ruler-line"></div>
-            <div class="ruler-line"></div>
-            <div class="ruler-line"></div>
-            <div class="ruler-line"></div>
-            <div class="ruler-line"></div>
-            <div class="ruler-line"></div>
-            <div class="ruler-line"></div>
-            <div class="ruler-line"></div>
-            <div class="ruler-line"></div>
-        </div>
-
         <div class="percent-label" id="percentText" style="bottom: 0%;">0%</div>
     </div>
 
@@ -182,21 +118,22 @@
         <div>Tín hiệu ADC: <span class="info-value" id="rawVal">0 / 1023</span></div>
     </div>
 
-    <div class="status-text" id="statusText">Đang chờ kết nối...</div>
+    <div class="status-text" id="statusText">Đang tải dữ liệu từ Firebase...</div>
 </div>
 
 <script>
-    function updateTankData() {
-        const ip = document.getElementById("ipInput").value.trim();
-        if (!ip) return;
+    const firebaseURL = "https://adcesp-63ece-default-rtdb.asia-southeast1.firebasedatabase.app/data.json";
 
-        fetch(`http://${ip}/data`, { mode: 'cors' })
+    function updateDataFromFirebase() {
+        fetch(firebaseURL)
             .then(response => {
-                if (!response.ok) throw new Error("Lỗi kết nối");
+                if (!response.ok) throw new Error("Không lấy được dữ liệu");
                 return response.json();
             })
             .then(data => {
-                let percent = data.percent;
+                if (!data) return;
+
+                let percent = data.percent || 0;
                 let water = document.getElementById('waterLevel');
                 let percentText = document.getElementById('percentText');
 
@@ -212,20 +149,21 @@
                     percentText.classList.remove('low');
                 }
 
-                document.getElementById('voltageVal').innerText = data.voltage + ' V';
-                document.getElementById('rawVal').innerText = data.raw + ' / 1023';
+                document.getElementById('voltageVal').innerText = (data.voltage || 0) + ' V';
+                document.getElementById('rawVal').innerText = (data.raw || 0) + ' / 1023';
 
-                document.getElementById('statusText').innerText = "Đã kết nối thành công!";
+                document.getElementById('statusText').innerText = "Đã kết nối Firebase (Thời gian thực)";
                 document.getElementById('statusText').style.color = "#00e676";
             })
             .catch(error => {
-                document.getElementById('statusText').innerText = "Không kết nối được tới ESP8266!";
+                document.getElementById('statusText').innerText = "Lỗi kết nối tới Firebase!";
                 document.getElementById('statusText').style.color = "#ff5252";
             });
     }
 
-    setInterval(updateTankData, 1000);
-    updateTankData();
+    // Cập nhật dữ liệu từ Firebase mỗi 1 giây
+    setInterval(updateDataFromFirebase, 1000);
+    updateDataFromFirebase();
 </script>
 
 </body>
